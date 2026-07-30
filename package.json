@@ -25,6 +25,7 @@
   "author": "Deepgram DX Team <devrel@deepgram.com> (https://developers.deepgram.com)",
   "license": "MIT",
   "dependencies": {
+    "@deepgram/sdk": "^5.7.0",
     "cors": "2.8.5",
     "dotenv": "17.2.3",
     "express": "5.2.1",

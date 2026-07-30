@@ -6,7 +6,7 @@ repository = "https://github.com/deepgram-starters/node-voice-agent"
 useCase = "voice-agent"
 language = "javascript"
 framework = "node"
-sdk = "N/A"
+sdk = "@deepgram/sdk"
 tags = ["voice-agent", "conversational-ai", "voice-ai", "voice-bot", "javascript", "node"]
 
 [check]
