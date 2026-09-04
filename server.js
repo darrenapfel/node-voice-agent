@@ -6,7 +6,7 @@
  * @deepgram/sdk `client.agent.v1` streaming support.
  *
  * The Deepgram side goes through the SDK, which manages the WebSocket, auth,
- * reconnection, and binary-audio framing. The browser-facing side is unchanged:
+ * and binary-audio framing. The browser-facing side is unchanged:
  * the frontend sends a Settings message + live-update / inject control JSON and
  * binary mic audio, and receives Deepgram's binary agent audio + JSON events
  * exactly as before.
@@ -201,10 +201,16 @@ wss.on('connection', async (clientWs, request) => {
   const pending = [];
 
   // Create the Deepgram Agent connection object (not yet connected).
+  //
+  // reconnectAttempts: 0 disables the SDK's automatic reconnect. A reconnected
+  // agent socket is a brand-new session that would need a fresh Settings
+  // message, and by then the browser side has already been closed, so the SDK
+  // default (30 retries) only opens orphan sessions while a browser's close
+  // handshake is still in flight.
   let dgConn;
   try {
     console.log('Initiating Deepgram connection...');
-    dgConn = await deepgram.agent.v1.createConnection();
+    dgConn = await deepgram.agent.v1.createConnection({ reconnectAttempts: 0 });
   } catch (error) {
     console.error('Failed to create Deepgram connection:', getErrorMessage(error, 'connection failed'));
     if (clientWs.readyState === WebSocket.OPEN) {
