@@ -7,14 +7,14 @@ Node.js demo app for Deepgram Voice Agent.
 - **Backend:** Node.js (JavaScript) on port 8081
 - **Frontend:** Vite + vanilla JS on port 8080 (git submodule: `voice-agent-html`)
 - **API type:** WebSocket — `WS /api/voice-agent`
-- **Deepgram API:** Agent API (`wss://agent.deepgram.com/v1/agent/converse`)
+- **Deepgram connection:** SDK-backed Agent API bridge (`deepgram.agent.v1.createConnection()` to `wss://agent.deepgram.com/v1/agent/converse`)
 - **Auth:** JWT session tokens via `/api/session` (WebSocket auth uses `access_token.<jwt>` subprotocol)
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `server.js` | Main backend — API endpoints and WebSocket proxy |
+| `server.js` | Main backend — API endpoints and SDK-backed WebSocket bridge |
 | `deepgram.toml` | Metadata, lifecycle commands, tags |
 | `Makefile` | Standardized build/run targets |
 | `sample.env` | Environment variable template |
@@ -85,7 +85,7 @@ Frontend: `cd frontend && corepack pnpm install`
 ## Customization Guide
 
 ### How the Agent Works
-The backend is a **pure WebSocket proxy** — it forwards messages between the browser and Deepgram's Agent API. All agent configuration happens via JSON messages from the frontend.
+The backend is an **SDK-backed WebSocket bridge**. It maps supported browser control messages and audio to `@deepgram/sdk`; all agent configuration still arrives as JSON messages from the frontend.
 
 ### Agent Settings (sent from frontend)
 The frontend sends a `Settings` message after connecting:
@@ -175,6 +175,7 @@ The frontend is a git submodule from `deepgram-starters/voice-agent-html`. To mo
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
 | `DEEPGRAM_API_KEY` | Yes | — | Deepgram API key |
+| `DEEPGRAM_BASE_URL` | No | production endpoint | Deepgram Agent WebSocket endpoint override, such as `wss://agent.staging.deepgram.com` |
 | `PORT` | No | `8081` | Backend server port |
 | `HOST` | No | `0.0.0.0` | Backend bind address |
 | `SESSION_SECRET` | No | — | JWT signing secret (production) |

@@ -47,6 +47,12 @@ const CONFIG = {
   host: process.env.HOST || '0.0.0.0',
 };
 
+function getErrorMessage(error, fallback) {
+  return typeof error?.message === 'string' && error.message
+    ? error.message
+    : fallback;
+}
+
 // A single SDK client is reused across connections; auth is resolved from the
 // API key here, so the browser never sees it.
 //
@@ -200,7 +206,7 @@ wss.on('connection', async (clientWs, request) => {
     console.log('Initiating Deepgram connection...');
     dgConn = await deepgram.agent.v1.createConnection();
   } catch (error) {
-    console.error('Failed to create Deepgram connection:', error);
+    console.error('Failed to create Deepgram connection:', getErrorMessage(error, 'connection failed'));
     if (clientWs.readyState === WebSocket.OPEN) {
       clientWs.send(JSON.stringify({
         type: 'Error',
@@ -211,6 +217,28 @@ wss.on('connection', async (clientWs, request) => {
     }
     activeConnections.delete(clientWs);
     return;
+  }
+
+  let clientClosing = false;
+  function failClientConnection() {
+    if (clientClosing || clientWs.readyState !== WebSocket.OPEN) return;
+
+    clientClosing = true;
+    const error = JSON.stringify({
+      type: 'Error',
+      description: 'Deepgram connection failed to open',
+      code: 'CONNECTION_FAILED'
+    });
+    try {
+      // Wait for the Error frame to flush before closing the browser socket.
+      clientWs.send(error, () => {
+        if (clientWs.readyState === WebSocket.OPEN) {
+          clientWs.close(1011, 'Deepgram connection failed to open');
+        }
+      });
+    } catch {
+      clientWs.close(1011, 'Deepgram connection failed to open');
+    }
   }
 
   // Route a control message from the browser to the matching SDK method. The
@@ -275,20 +303,35 @@ wss.on('connection', async (clientWs, request) => {
   });
 
   dgConn.on('error', (error) => {
-    console.error('Deepgram socket error:', error);
-    if (clientWs.readyState === WebSocket.OPEN) {
+    const message = getErrorMessage(error, 'Deepgram connection error');
+    console.error('Deepgram socket error:', message);
+    if (dgReady && clientWs.readyState === WebSocket.OPEN) {
       clientWs.send(JSON.stringify({
         type: 'Error',
-        description: error.message || 'Deepgram connection error',
+        description: message,
         code: 'PROVIDER_ERROR'
       }));
     }
   });
 
-  dgConn.on('close', () => {
-    console.log('Deepgram connection closed');
+  dgConn.on('close', (event) => {
+    const code = event?.code;
+    const reason = typeof event?.reason === 'string' && event.reason
+      ? event.reason
+      : 'Deepgram connection closed';
+    console.log(`Deepgram connection closed: ${code || 1000} ${reason}`);
     if (clientWs.readyState === WebSocket.OPEN) {
-      clientWs.close(1000, 'Deepgram connection closed');
+      if (!dgReady) {
+        failClientConnection();
+        return;
+      }
+
+      // Reserved close codes cannot be sent by an application.
+      const reservedCodes = [1004, 1005, 1006, 1015];
+      const closeCode = typeof code === 'number' && code >= 1000 && code <= 4999 && !reservedCodes.includes(code)
+        ? code
+        : 1000;
+      clientWs.close(closeCode, reason);
     }
   });
 
@@ -361,15 +404,8 @@ wss.on('connection', async (clientWs, request) => {
     }
     pending.length = 0;
   } catch (error) {
-    console.error('Deepgram connection did not open:', error);
-    if (clientWs.readyState === WebSocket.OPEN) {
-      clientWs.send(JSON.stringify({
-        type: 'Error',
-        description: 'Deepgram connection failed to open',
-        code: 'CONNECTION_FAILED'
-      }));
-      clientWs.close();
-    }
+    console.error('Deepgram connection did not open:', getErrorMessage(error, 'connection failed'));
+    failClientConnection();
   }
 });
 
